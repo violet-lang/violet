@@ -279,6 +279,110 @@ lex_symbol :: proc(self: ^Tokenizer) -> Token {
 	}
 }
 
+lex_hexadecimal :: proc(self: ^Tokenizer) {
+  next_rune(self) // skips the 'x'
+
+  count := 0
+  for {
+    rune := peek_rune(self)
+
+    // check if the next digit is hexadecimal
+    switch (rune) {
+      case 'a': case 'b': case 'c': case 'd': case 'e': case 'f':
+      case 'A': case 'B': case 'C': case 'D': case 'E': case 'F':
+        count += 1
+        break
+      case:
+        if !unicode.is_digit(rune) {
+          if count == 0 {
+            // TODO: error because there are no hexadecimal digits
+          }
+          return
+        }
+    }
+
+    next_rune(self)
+  }
+}
+
+lex_exponent :: proc(self: ^Tokenizer) {
+  next_rune(self) // skips the 'e'
+
+  rune := peek_rune(self)
+
+  // check whether the exponent is positive or negative
+  if rune == '+' || rune == '-' {
+    next_rune(self)
+
+    count := 0
+    for {
+      rune = peek_rune(self)
+
+      if !unicode.is_digit(rune) {
+        if count == 0 {
+          // TODO: error because there are no exponent digits
+        }
+        return
+      }
+      
+      count += 1
+      next_rune(self)
+    }
+  } else {
+    // TODO: error because the exponent wasn't specified positive or negative
+  }
+}
+
+lex_floating :: proc(self: ^Tokenizer) {
+  next_rune(self) // skips the '.'
+
+  for {
+    rune := peek_rune(self)
+
+    if rune == 'e' || rune == 'E' {
+      lex_exponent(self)
+      break
+    }
+
+    if !unicode.is_digit(rune) {
+      return
+    }
+
+    next_rune(self)
+  }
+}
+
+lex_number :: proc(self: ^Tokenizer) -> Token {
+  start_index := self.current_index
+  kind := TokenKind.IntegerLiteral
+
+  for {
+    rune := peek_rune(self)
+
+    if rune == 'x' {
+      lex_hexadecimal(self)
+      break
+    }
+    
+    if rune == '.' {
+      kind = TokenKind.FloatingLiteral
+      lex_floating(self)
+      break
+    }
+
+    if !unicode.is_digit(rune) {
+      break
+    }
+
+    next_rune(self)
+  }
+
+  return Token {
+		kind = kind,
+		value = cast(string)self.file.contents[start_index:self.current_index],
+	}
+}
+
 skip_white_space :: proc(self: ^Tokenizer) {
   for {
     if (unicode.is_white_space(peek_rune(self))) {
@@ -308,7 +412,9 @@ next_token :: proc(self: ^Tokenizer) -> (Token, bool) {
 		token = lex_string(self)
   } else if unicode.is_punct(first_rune) || unicode.is_symbol(first_rune) {
     token = lex_symbol(self)
-  }else {
+  } else if unicode.is_digit(first_rune) {
+    token = lex_number(self)
+  } else {
 		return ---, false
 	}
 	

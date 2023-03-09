@@ -5,6 +5,8 @@ TokenKind :: enum {
 
   Iden,
   StrLiteral,
+  IntegerLiteral,
+  FloatingLiteral,
   
   OpenParen,
   CloseParen,
