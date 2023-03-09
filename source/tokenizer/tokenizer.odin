@@ -68,14 +68,13 @@ identifier_kind :: proc(value: string) -> TokenKind {
   return TokenKind.Iden
 }
 
-lex_iden :: proc(self: ^Tokenizer) -> (Token, bool) {
+lex_iden :: proc(self: ^Tokenizer) -> Token {
 	start_index := self.current_index
-	start_line := self.current_line
-  start_column := self.current_column
 
-	if !is_iden_start(peek_rune(self)) {
-		return ---, false
-	}
+	// assume that the first character is a valid identifier start
+	// if !is_iden_start(peek_rune(self)) {
+	// 	return ---,
+	// }
 
 	for {
 		rune := peek_rune(self)
@@ -89,17 +88,13 @@ lex_iden :: proc(self: ^Tokenizer) -> (Token, bool) {
 
   value := cast(string)self.file.contents[start_index:self.current_index]
 	return Token {
-    line = start_line,
-    column = start_column,
 		kind = identifier_kind(value),
 		value = value,
-	}, true
+	}
 }
 
-lex_string :: proc(self: ^Tokenizer) -> (Token, bool) {
+lex_string :: proc(self: ^Tokenizer) -> Token {
   start_index := self.current_index
-	start_line := self.current_line
-  start_column := self.current_column
 
 	next_rune(self) // skips the opening quote
 
@@ -124,11 +119,9 @@ lex_string :: proc(self: ^Tokenizer) -> (Token, bool) {
 	}
 
 	return Token {
-    line = start_line,
-    column = start_column,
 		kind = TokenKind.StrLiteral,
 		value = cast(string)self.file.contents[start_index:self.current_index],
-	}, true
+	}
 }
 
 skip_white_space :: proc(self: ^Tokenizer) {
@@ -147,16 +140,22 @@ next_token :: proc(self: ^Tokenizer) -> (Token, bool) {
 	first_rune := peek_rune(self)
 
 	if first_rune == 0 {
-		return Token { kind = TokenKind.EOF, value = "" }, false
+		return ---, false
 	}
 
+  token: Token
+  first_line := self.current_line
+  first_column := self.current_column
+
   if is_iden_start(first_rune) {
-	  return lex_iden(self)
-  }
-
-  if first_rune == '"' {
-    return lex_string(self)
-  }
-
-  return Token { kind = TokenKind.Invalid, value = "" }, false
+		token = lex_iden(self)
+  } else if first_rune == '"' {
+		token = lex_string(self)
+  } else {
+		return ---, false
+	}
+	
+	token.line = first_line
+	token.column = first_column
+	return token, true
 }

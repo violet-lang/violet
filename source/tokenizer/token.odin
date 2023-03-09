@@ -2,7 +2,6 @@ package tokenizer
 
 TokenKind :: enum {
   Invalid,
-  EOF,
 
   Iden,
   StrLiteral,
