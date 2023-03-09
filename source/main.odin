@@ -22,7 +22,7 @@ enable_utf8 :: proc() {
 main :: proc() {
 	enable_utf8()
 
-	f, errno := file.read("test.vi")
+	f, errno := file.read(os.args[1])
 
 	if errno == 0 {
 		defer file.close(&f)
