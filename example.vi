@@ -5,4 +5,5 @@ export std.println;
 func main()
   println("Hello, world!");
   let test = 0
+  let test1 = 'a';
 end

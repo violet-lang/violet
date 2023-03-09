@@ -2,9 +2,11 @@ package tokenizer
 
 TokenKind :: enum {
   Invalid,
+  Comment,
 
   Iden,
   StrLiteral,
+  CharLiteral,
   IntegerLiteral,
   FloatingLiteral,
   

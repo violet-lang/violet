@@ -112,7 +112,7 @@ lex_string :: proc(self: ^Tokenizer) -> Token {
 		rune := peek_rune(self)
 		
 		if rune == 0 || rune == '\n' {
-      // TODO: make error because end of string isn't found
+      // TODO: make error because ending quote isn't found
 			break
 		}
 
@@ -132,6 +132,78 @@ lex_string :: proc(self: ^Tokenizer) -> Token {
 		kind = TokenKind.StrLiteral,
 		value = cast(string)self.file.contents[start_index:self.current_index],
 	}
+}
+
+lex_char :: proc(self: ^Tokenizer) -> Token {
+  start_index := self.current_index
+
+	next_rune(self) // skips the opening quote
+
+  count := 0
+  for {
+		rune := peek_rune(self)
+		
+		if rune == 0 || rune == '\n' {
+      // TODO: make error because ending quote isn't found
+			break
+		}
+
+    count += 1
+
+    if rune == '\\' {
+			next_rune(self) // skip the backslash
+    } 
+		
+		// if the character was an escape, this skips the character after the backslash as well
+		next_rune(self)
+
+    if rune == '\'' {
+      break
+    }
+	}
+
+  if count == 0 {
+    // TODO: error because the character literal is empty
+  }
+
+  if count > 1 {
+    // TODO: error because the character literal has more than one character
+  }
+
+	return Token {
+		kind = TokenKind.CharLiteral,
+		value = cast(string)self.file.contents[start_index:self.current_index],
+	}
+}
+
+lex_single_line_comment :: proc(self: ^Tokenizer) {
+  for {
+    rune := peek_rune(self)
+
+    if rune == '\n' || rune == 0 {
+      break
+    }
+
+    next_rune(self)
+  }
+}
+
+lex_multi_line_comment :: proc(self: ^Tokenizer) {
+  for {
+    rune := peek_rune(self)
+
+    if rune == '*' {
+      rune = next_rune(self)
+
+      if rune == '/' {
+        break
+      }
+    } else if rune == 0 {
+      break
+    }
+
+    next_rune(self)
+  }
 }
 
 lex_symbol :: proc(self: ^Tokenizer) -> Token {
@@ -215,6 +287,10 @@ lex_symbol :: proc(self: ^Tokenizer) -> Token {
       switch (op_rune) {
         // /=
         case '=': kind = TokenKind.OpDivideEqual; break
+        // single line comment
+        case '/': kind = TokenKind.Comment; lex_single_line_comment(self); break;
+        // multi line comment
+        case '*': kind = TokenKind.Comment; lex_multi_line_comment(self); break;
         case 0: break
         case: fall_back(self, op_rune)
       }
@@ -410,6 +486,8 @@ next_token :: proc(self: ^Tokenizer) -> (Token, bool) {
 		token = lex_iden(self)
   } else if first_rune == '"' {
 		token = lex_string(self)
+  } else if first_rune == '\'' {
+		token = lex_char(self)
   } else if unicode.is_punct(first_rune) || unicode.is_symbol(first_rune) {
     token = lex_symbol(self)
   } else if unicode.is_digit(first_rune) {
