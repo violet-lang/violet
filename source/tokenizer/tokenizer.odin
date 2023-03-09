@@ -47,6 +47,13 @@ next_rune :: proc(self: ^Tokenizer) -> rune {
 	return rune
 }
 
+fall_back :: proc(self: ^Tokenizer, current: rune) -> rune {
+  self.current_column -= 1
+  self.current_index -= utf8.rune_size(current)
+  
+  return utf8.rune_at(cast(string)self.file.contents, self.current_index)
+}
+
 // Returns `true` if the character can start an identifier.
 is_iden_start :: proc(c: rune) -> bool {
 	return unicode.is_letter(c) || c == '_'
@@ -61,8 +68,7 @@ is_iden_continue :: proc(c: rune) -> bool {
 // or identifier.
 identifier_kind :: proc(value: string) -> TokenKind {
   switch (value) {
-    case "func":
-      return TokenKind.KeywordFunc
+    case "func": return TokenKind.KeywordFunc
   }
 
   return TokenKind.Iden
@@ -124,6 +130,151 @@ lex_string :: proc(self: ^Tokenizer) -> Token {
 	}
 }
 
+lex_symbol :: proc(self: ^Tokenizer) -> Token {
+  start_index := self.current_index
+  kind := TokenKind.Invalid
+
+  rune := next_rune(self)
+  switch(rune) {
+    case '(': kind = TokenKind.OpenParen; break
+    case ')': kind = TokenKind.CloseParen; break
+    case '[': kind = TokenKind.OpenBracket; break
+    case ']': kind = TokenKind.CloseBracket; break
+    case '{': kind = TokenKind.OpenBrace; break
+    case '}': kind = TokenKind.CloseBrace; break
+    case ':': kind = TokenKind.Colon; break
+    case ';': kind = TokenKind.SemiColon; break
+    case ',': kind = TokenKind.Comma; break
+    case '.': kind = TokenKind.Period; break
+    case '@': kind = TokenKind.At; break
+    case '?': kind = TokenKind.Question; break
+    case '<':
+      kind = TokenKind.OpLessThan
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // <=
+        case '=': kind = TokenKind.OpLessEqual; break
+        // <<
+        case '<': kind = TokenKind.OpBinaryShiftLeft; break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '>':
+      kind = TokenKind.OpGreaterThan
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // >=
+        case '=': kind = TokenKind.OpGreaterEqual; break
+        // >>
+        case '>': kind = TokenKind.OpBinaryShiftRight; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '+':
+      kind = TokenKind.OpPlus
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // +=
+        case '=': kind = TokenKind.OpPlusEqual; break
+        // ++
+        case '+': kind = TokenKind.OpIncrement; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '-':
+      kind = TokenKind.OpMinus
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // -=
+        case '=': kind = TokenKind.OpMinusEqual; break
+        // --
+        case '-': kind = TokenKind.OpDecrement; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '*':
+      kind = TokenKind.OpMultiply
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // *=
+        case '=': kind = TokenKind.OpMultiplyEqual; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '/':
+      kind = TokenKind.OpDivide
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // /=
+        case '=': kind = TokenKind.OpDivideEqual; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '%':
+      kind = TokenKind.OpModulo
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // /=
+        case '=': kind = TokenKind.OpModuloEqual; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '=':
+      kind = TokenKind.OpAssign
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // ==
+        case '=': kind = TokenKind.OpEqual; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '!':
+      kind = TokenKind.OpNot
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // !=
+        case '=': kind = TokenKind.OpNotEqual; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '&':
+      kind = TokenKind.OpBinaryAnd
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // &&
+        case '&': kind = TokenKind.OpAnd; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '|':
+      kind = TokenKind.OpBinaryOr
+      op_rune := next_rune(self)
+      switch (op_rune) {
+        // ||
+        case '|': kind = TokenKind.OpOr; break
+        case 0: break
+        case: fall_back(self, op_rune)
+      }
+      break
+    case '^': kind = TokenKind.OpBinaryXOr; break
+    case '~': kind = TokenKind.OpBinaryComplement; break
+  }
+  
+  return Token {
+		kind = kind,
+		value = cast(string)self.file.contents[start_index:self.current_index],
+	}
+}
+
 skip_white_space :: proc(self: ^Tokenizer) {
   for {
     if (unicode.is_white_space(peek_rune(self))) {
@@ -151,7 +302,9 @@ next_token :: proc(self: ^Tokenizer) -> (Token, bool) {
 		token = lex_iden(self)
   } else if first_rune == '"' {
 		token = lex_string(self)
-  } else {
+  } else if unicode.is_punct(first_rune) || unicode.is_symbol(first_rune) {
+    token = lex_symbol(self)
+  }else {
 		return ---, false
 	}
 	

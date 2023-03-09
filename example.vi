@@ -1,0 +1,8 @@
+import "std";
+using std.println;
+export std.println;
+
+func main()
+  println("Hello, world!");
+  let test = 0
+end

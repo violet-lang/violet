@@ -11,10 +11,10 @@ File :: struct {
 }
 
 read :: proc(path: string) -> (File, os.Errno) {
-  handle, file_err := os.open("test.vi")
+  handle, file_err := os.open(path)
 	defer os.close(handle)
 
-	file_info, stat_err := os.stat("test.vi")
+	file_info, stat_err := os.stat(path)
 	
 	if file_err == 0 && stat_err == 0 {
 		ptr: rawptr = mem.alloc(cast(int)file_info.size)
