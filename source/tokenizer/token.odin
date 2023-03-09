@@ -48,7 +48,11 @@ TokenKind :: enum {
   OpBinaryXOr, // ^
   OpBinaryComplement, // ~
 
+  KeywordEnd,
+  KeywordExport,
   KeywordFunc,
+  KeywordImport,
+  KeywordUsing,
 }
 
 Token :: struct {

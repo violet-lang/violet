@@ -68,7 +68,11 @@ is_iden_continue :: proc(c: rune) -> bool {
 // or identifier.
 identifier_kind :: proc(value: string) -> TokenKind {
   switch (value) {
+    case "end": return TokenKind.KeywordEnd
+    case "export": return TokenKind.KeywordExport
     case "func": return TokenKind.KeywordFunc
+    case "import": return TokenKind.KeywordImport
+    case "using": return TokenKind.KeywordUsing
   }
 
   return TokenKind.Iden
