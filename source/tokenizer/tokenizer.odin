@@ -1,6 +1,7 @@
 package tokenizer
 
 import "../file"
+import "core:os"
 import "core:fmt"
 import "core:slice"
 import "core:unicode"
@@ -11,6 +12,11 @@ Tokenizer :: struct {
   current_index: int,
   current_line: int,
   current_column: int,
+}
+
+err :: proc(self: ^Tokenizer, msg: string)  {
+  fmt.printf("%s:%i:%i \x1b[31mERROR:\x1b[0m %s\n", self.file.path, self.current_line, self.current_column, msg)
+  os.exit(-1)
 }
 
 new :: proc(file: ^file.File) -> Tokenizer {
@@ -112,8 +118,7 @@ lex_string :: proc(self: ^Tokenizer) -> Token {
 		rune := peek_rune(self)
 		
 		if rune == 0 || rune == '\n' {
-      // TODO: make error because ending quote isn't found
-			break
+      err(self, "String literal isn't terminated")			
 		}
 
     if rune == '\\' {
@@ -144,11 +149,8 @@ lex_char :: proc(self: ^Tokenizer) -> Token {
 		rune := peek_rune(self)
 		
 		if rune == 0 || rune == '\n' {
-      // TODO: make error because ending quote isn't found
-			break
+      err(self, "Character literal isn't terminated")
 		}
-
-    count += 1
 
     if rune == '\\' {
 			next_rune(self) // skip the backslash
@@ -160,14 +162,16 @@ lex_char :: proc(self: ^Tokenizer) -> Token {
     if rune == '\'' {
       break
     }
+
+    count += 1
 	}
 
   if count == 0 {
-    // TODO: error because the character literal is empty
+    err(self, "Character literal is empty")
   }
 
   if count > 1 {
-    // TODO: error because the character literal has more than one character
+    err(self, "Character contains more than one character")
   }
 
 	return Token {
@@ -371,7 +375,7 @@ lex_hexadecimal :: proc(self: ^Tokenizer) {
       case:
         if !unicode.is_digit(rune) {
           if count == 0 {
-            // TODO: error because there are no hexadecimal digits
+            err(self, "Invalid token")
           }
           return
         }
@@ -396,7 +400,7 @@ lex_exponent :: proc(self: ^Tokenizer) {
 
       if !unicode.is_digit(rune) {
         if count == 0 {
-          // TODO: error because there are no exponent digits
+          err(self, "Invalid token")
         }
         return
       }
@@ -405,27 +409,33 @@ lex_exponent :: proc(self: ^Tokenizer) {
       next_rune(self)
     }
   } else {
-    // TODO: error because the exponent wasn't specified positive or negative
+    err(self, "Invalid token")
   }
 }
 
 lex_floating :: proc(self: ^Tokenizer) {
   next_rune(self) // skips the '.'
-
+  count := 0
   for {
     rune := peek_rune(self)
 
+    count += 1
+
     if rune == 'e' || rune == 'E' {
       lex_exponent(self)
-      break
+      return
     }
 
     if !unicode.is_digit(rune) {
+      count -= 1
+      if count == 0 {
+        err(self, "Invalid token")
+      }
       return
     }
 
     next_rune(self)
-  }
+  }  
 }
 
 lex_number :: proc(self: ^Tokenizer) -> Token {
