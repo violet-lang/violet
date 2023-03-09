@@ -11,6 +11,8 @@ TokenKind :: enum {
 }
 
 Token :: struct {
+  line: int,
+  column: int,
   kind: TokenKind,
   value: string,
 }

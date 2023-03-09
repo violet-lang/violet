@@ -9,10 +9,12 @@ import "core:unicode/utf8"
 Tokenizer :: struct {
   file: ^file.File,
   current_index: int,
+  current_line: int,
+  current_column: int,
 }
 
 new :: proc(file: ^file.File) -> Tokenizer {
-	return Tokenizer { file = file, current_index = 0 }
+	return Tokenizer { file = file, current_index = 0, current_column = 1, current_line = 1, }
 }
 
 // Returns the next rune without advancing the current index.
@@ -28,7 +30,7 @@ peek_rune :: proc(self: ^Tokenizer) -> rune {
 
 // Returns the next rune and advances the current index.
 //
-// Returns 0 if there is no runes left in the file.
+// Returns 0 if there are no runes left in the file.
 next_rune :: proc(self: ^Tokenizer) -> rune {
 	if self.current_index >= slice.length(self.file.contents) {
 		return 0
@@ -36,6 +38,12 @@ next_rune :: proc(self: ^Tokenizer) -> rune {
 
   rune := utf8.rune_at(cast(string)self.file.contents, self.current_index)
 	self.current_index += utf8.rune_size(rune)
+  self.current_column += 1
+  if rune == '\n' {
+    self.current_line += 1
+    self.current_column = 1
+  }
+
 	return rune
 }
 
@@ -62,6 +70,8 @@ identifier_kind :: proc(value: string) -> TokenKind {
 
 lex_iden :: proc(self: ^Tokenizer) -> (Token, bool) {
 	start_index := self.current_index
+	start_line := self.current_line
+  start_column := self.current_column
 
 	if !is_iden_start(peek_rune(self)) {
 		return ---, false
@@ -79,6 +89,8 @@ lex_iden :: proc(self: ^Tokenizer) -> (Token, bool) {
 
   value := cast(string)self.file.contents[start_index:self.current_index]
 	return Token {
+    line = start_line,
+    column = start_column,
 		kind = identifier_kind(value),
 		value = value,
 	}, true
@@ -86,6 +98,8 @@ lex_iden :: proc(self: ^Tokenizer) -> (Token, bool) {
 
 lex_string :: proc(self: ^Tokenizer) -> (Token, bool) {
   start_index := self.current_index
+	start_line := self.current_line
+  start_column := self.current_column
 
 	next_rune(self) // skips the opening quote
 
@@ -110,6 +124,8 @@ lex_string :: proc(self: ^Tokenizer) -> (Token, bool) {
 	}
 
 	return Token {
+    line = start_line,
+    column = start_column,
 		kind = TokenKind.StrLiteral,
 		value = cast(string)self.file.contents[start_index:self.current_index],
 	}, true

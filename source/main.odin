@@ -31,7 +31,7 @@ main :: proc() {
 		token, is_valid := tokenizer.next_token(&lexer)
 
 		for is_valid != false {
-			fmt.printf("%s: %s\n", token.kind, token.value)
+			fmt.printf("test.vi:%i:%i: %s: %s\n", token.line, token.column, token.kind, token.value)
 			token, is_valid = tokenizer.next_token(&lexer)
 		}
 	}
